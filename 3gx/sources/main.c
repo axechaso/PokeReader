@@ -10,6 +10,7 @@
 #include "title_info.h"
 #include "hid.h"
 #include "memmem.h"
+#include "time_lock.h"
 
 static Handle thread;
 static Handle memLayoutChanged;
@@ -140,6 +141,14 @@ extern char *fake_heap_end;
 extern u32 __ctru_heap;
 extern u32 __ctru_linear_heap;
 
+static u8 *find_unique(u8 *base, u32 length, const u8 *pattern, u32 size)
+{
+    u8 *found = memmem(base, length, pattern, size);
+    if (!found) return NULL;
+    u32 remaining = length - (u32)(found - base) - 1;
+    return memmem(found + 1, remaining, pattern, size) ? NULL : found;
+}
+
 u32 __ctru_heap_size = 0;
 u32 __ctru_linear_heap_size = 0;
 
@@ -163,6 +172,14 @@ void main(void)
 
     // Init services
     srvInit();
+    if (R_FAILED(host_tl_platform_init())) return;
+
+    u32 startup_status = reader_startup_status();
+    if (startup_status != 1) {
+        if (startup_status >= 2)
+            host_tl_message("Game version, code fingerprint or hook bytes did not match.\nPokeReader was not installed. The game will start normally.");
+        return;
+    }
 
     // NTP epoch (milliseconds since 1st Jan 1900 00:00)
     u64 ms = osGetTime();
@@ -175,13 +192,36 @@ void main(void)
 
     MemInfo info;
     PageInfo out;
-    svcQueryMemory(&info, &out, 0x100000);
+    if (R_FAILED(svcQueryMemory(&info, &out, 0x100000)) || info.size < sizeof(DRAW_PATCH) ||
+        !(info.perm & MEMPERM_READ) || info.base_addr > 0x100000) return;
  
-    u32 present_buffer_ptr = (u32)memmem((u8*)info.base_addr, info.size, PRESENT_FRAMEBUFFER_BYTES, sizeof(PRESENT_FRAMEBUFFER_BYTES)) - 8;
-    u32 map_input_memory_block = (u32)memmem((u8*)info.base_addr, info.size, MAP_INPUT_BLOCK, sizeof(MAP_INPUT_BLOCK));
+    u8 *present = find_unique((u8*)info.base_addr, info.size, PRESENT_FRAMEBUFFER_BYTES, sizeof(PRESENT_FRAMEBUFFER_BYTES));
+    u8 *input = find_unique((u8*)info.base_addr, info.size, MAP_INPUT_BLOCK, sizeof(MAP_INPUT_BLOCK));
+    if (!present || !input || (u32)present < info.base_addr + 8) {
+        host_tl_message("Overlay signatures were missing or ambiguous.\nNo hooks were installed.");
+        return;
+    }
+    u32 present_buffer_ptr = (u32)present - 8;
+    u32 map_input_memory_block = (u32)input;
+    u64 code_end = (u64)info.base_addr + info.size;
+    if ((present_buffer_ptr & 3) || (map_input_memory_block & 3) ||
+        (u64)present_buffer_ptr + sizeof(DRAW_PATCH) > code_end ||
+        (u64)map_input_memory_block + 16 > code_end ||
+        ((u64)present_buffer_ptr < (u64)map_input_memory_block + 16 &&
+         (u64)map_input_memory_block < (u64)present_buffer_ptr + sizeof(DRAW_PATCH)) ||
+        (*(u32 *)(present_buffer_ptr + 0x20) >> 24) != 0xeb) {
+        host_tl_message("Overlay layout did not match. No hooks were installed.");
+        return;
+    }
+
+    u32 present_pa = svcConvertVAToPA((void *)present_buffer_ptr, false);
+    u32 input_pa = svcConvertVAToPA((void *)map_input_memory_block, false);
+    if (!present_pa || !input_pa) return;
+    // Flush cached aliases before modifying code through the uncached physical map.
+    svcFlushProcessDataCache(CUR_PROCESS_HANDLE, info.base_addr, info.size);
 
     u32 get_screen_branch = *(u32 *)(present_buffer_ptr + 0x20) + 1;
-    u32 *present_buffer_pa = (u32 *)PA_FROM_VA_PTR(present_buffer_ptr);
+    u32 *present_buffer_pa = (u32 *)PA_PTR(present_pa);
     memcpy(present_buffer_pa, DRAW_PATCH, 0x94);
     present_buffer_pa[7] = get_screen_branch; // fix get_screen branch instruction
     present_buffer_pa[29] = (u32)run_hook;
@@ -189,7 +229,7 @@ void main(void)
     set_trampoline_addr(trampoline_addr);
     set_route_hook_addr(trampoline_addr + (6 * 4));
 
-    u32 *map_input_memory_block_pa = (u32 *)PA_FROM_VA_PTR(map_input_memory_block);
+    u32 *map_input_memory_block_pa = (u32 *)PA_PTR(input_pa);
     memcpy(map_input_memory_block_pa, HID_INPUT_MAP_PATCH, 0x8);
     // 4 instructions * 4 bytes per instruction
     map_input_memory_block_pa[0x2] = (u32)map_input_memory_block + (0x4 * 0x4); // set return address

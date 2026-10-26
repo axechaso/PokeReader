@@ -141,6 +141,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "pkm-rs",
+ "time-lock-core",
 ]
 
 [[package]]
@@ -171,6 +172,10 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "time-lock-core"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"

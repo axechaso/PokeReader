@@ -1,20 +1,37 @@
 name: Lint, Test, Build
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
-      - "*"
+      - "**"
       - "!main"
 
 jobs:
+  offline-tools:
+    name: Inspect-code tool tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests -v
+
   lint-test-build:
     name: Lint, test, and build
     runs-on: ubuntu-latest
     container: zaksabeast/devkitarm-rust
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reproduce upstream baseline
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git worktree add --detach /tmp/pokereader-baseline 155de39c4b69de89a0f81381c60861bc21d10364
+          make -C /tmp/pokereader-baseline
+          sha256sum /tmp/pokereader-baseline/out/default.3gx > baseline-build.txt
 
       - name: Lint
         run: make lint
@@ -25,9 +42,19 @@ jobs:
       - name: Build
         run: make
 
+      - name: Record build environment
+        run: |
+          {
+            rustc +nightly-2024-03-21 --version
+            arm-none-eabi-gcc --version
+            cat /opt/devkitpro/libctru/include/3ds/version.h
+            sha256sum out/default.3gx out/PokeReader-Time.3dsx
+          } > out/build-info.txt
+          cp baseline-build.txt out/
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PokeReader
           retention-days: 3
-          path: out/default.3gx
+          path: out/

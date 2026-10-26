@@ -28,6 +28,7 @@ enum OrasView {
     MirageSpot,
     SeedRng,
     HelpMenu,
+    TimeControl,
 }
 
 struct PersistedState {
@@ -51,6 +52,7 @@ const MENU: &[MenuOption<OrasView>] = &[
     MenuOption::new(OrasView::MirageSpot, "Mirage Spot"),
     MenuOption::new(OrasView::SeedRng, "Seed RNG"),
     MenuOption::new(OrasView::HelpMenu, "Help"),
+    MenuOption::new(OrasView::TimeControl, "Time control (dev)"),
 ];
 
 unsafe fn get_state() -> &'static mut PersistedState {
@@ -110,6 +112,7 @@ pub fn run_oras_frame() {
         OrasView::SeedRng => draw_seed_rng(&reader, &state.rng),
         OrasView::MirageSpot => draw_mirage_spot(&reader),
         OrasView::HelpMenu => state.help_menu.update_and_draw(is_locked),
+        OrasView::TimeControl => crate::time_lock::update_and_draw(is_locked),
         OrasView::MainMenu => {
             state.main_menu.update_view();
             state.main_menu.draw();

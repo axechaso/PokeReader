@@ -42,6 +42,7 @@ enum Gen7View {
     Pelago,
     Citra,
     HelpMenu,
+    TimeControl,
 }
 
 struct PersistedState {
@@ -66,6 +67,7 @@ const MENU: &[MenuOption<Gen7View>] = &[
     MenuOption::new(Gen7View::Box, "Box"),
     MenuOption::new(Gen7View::Pelago, "Pelago"),
     MenuOption::new(Gen7View::Citra, "Citra"),
+    MenuOption::new(Gen7View::TimeControl, "Time control (dev)"),
     MenuOption::new(Gen7View::HelpMenu, "Help"),
 ];
 
@@ -132,6 +134,7 @@ fn run_frame(reader: Gen7Reader) {
             draw_pkx(&reader.pelago_pkm((slot - 1) as u32), PkxType::Wild)
         }
         Gen7View::HelpMenu => state.help_menu.update_and_draw(is_locked),
+        Gen7View::TimeControl => crate::time_lock::update_and_draw(is_locked),
         Gen7View::MainMenu => {
             state.main_menu.update_view();
             state.main_menu.draw();

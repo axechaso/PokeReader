@@ -24,6 +24,7 @@ enum XyView {
     Party,
     SeedRng,
     HelpMenu,
+    TimeControl,
 }
 
 struct PersistedState {
@@ -45,6 +46,7 @@ const MENU: &[MenuOption<XyView>] = &[
     MenuOption::new(XyView::Party, "Party"),
     MenuOption::new(XyView::SeedRng, "Seed RNG"),
     MenuOption::new(XyView::HelpMenu, "Help"),
+    MenuOption::new(XyView::TimeControl, "Time control (dev)"),
 ];
 
 unsafe fn get_state() -> &'static mut PersistedState {
@@ -102,6 +104,7 @@ pub fn run_xy_frame() {
         }
         XyView::SeedRng => draw_seed_rng(&reader, &state.rng),
         XyView::HelpMenu => state.help_menu.update_and_draw(is_locked),
+        XyView::TimeControl => crate::time_lock::update_and_draw(is_locked),
         XyView::MainMenu => {
             state.main_menu.update_view();
             state.main_menu.draw();

@@ -10,6 +10,7 @@ once_cell = { version = "1.16", default-features = false }
 pkm-rs = { git = "https://github.com/zaksabeast/pkm-rs.git", rev = "9d1c647" }
 libc_alloc = "1.0.6"
 chrono = { version = "0.4.34", default-features = false, features = ["alloc"] }
+time-lock-core = { path = "../time_lock_core" }
 
 [features]
 # cfg(doctest) doesn't appear to have worked for a while now, and there's a lot of confusion around it.
