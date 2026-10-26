@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "save" => {
                 fs::write(argument, preset.to_string())?;
-                println!("Saved disabled preset: {argument}");
+                println!("Saved preset: {argument} (enabled={})", preset.enabled);
                 continue;
             }
             _ => {

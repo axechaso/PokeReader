@@ -193,7 +193,7 @@ void main(void)
     MemInfo info;
     PageInfo out;
     if (R_FAILED(svcQueryMemory(&info, &out, 0x100000)) || info.size < sizeof(DRAW_PATCH) ||
-        !(info.perm & MEMPERM_READ) || info.base_addr > 0x100000) return;
+        !(info.perm & MEMPERM_READ) || !(info.perm & MEMPERM_EXECUTE) || info.base_addr > 0x100000) return;
  
     u8 *present = find_unique((u8*)info.base_addr, info.size, PRESENT_FRAMEBUFFER_BYTES, sizeof(PRESENT_FRAMEBUFFER_BYTES));
     u8 *input = find_unique((u8*)info.base_addr, info.size, MAP_INPUT_BLOCK, sizeof(MAP_INPUT_BLOCK));
@@ -216,9 +216,11 @@ void main(void)
 
     u32 present_pa = svcConvertVAToPA((void *)present_buffer_ptr, false);
     u32 input_pa = svcConvertVAToPA((void *)map_input_memory_block, false);
-    if (!present_pa || !input_pa) return;
+    if (!present_pa || !input_pa || present_buffer_ptr < 0x100010 || map_input_memory_block < 0x100010 ||
+        svcConvertVAToPA((void *)(present_buffer_ptr + sizeof(DRAW_PATCH) - 1), false) != present_pa + sizeof(DRAW_PATCH) - 1 ||
+        svcConvertVAToPA((void *)(map_input_memory_block + 15), false) != input_pa + 15) return;
     // Flush cached aliases before modifying code through the uncached physical map.
-    svcFlushProcessDataCache(CUR_PROCESS_HANDLE, info.base_addr, info.size);
+    if (R_FAILED(svcFlushProcessDataCache(CUR_PROCESS_HANDLE, info.base_addr, info.size))) return;
 
     u32 get_screen_branch = *(u32 *)(present_buffer_ptr + 0x20) + 1;
     u32 *present_buffer_pa = (u32 *)PA_PTR(present_pa);

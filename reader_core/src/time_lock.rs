@@ -106,6 +106,7 @@ fn load_preset(title: u64) -> (Preset, &'static str) {
     let mut preset = Preset::new(title);
     if let Ok(now) = from_1900_ms(real_ms()).and_then(DateTime::from_epoch_ms) {
         preset.target = now;
+        preset.target.millisecond = 0;
     }
     (
         preset,
@@ -389,6 +390,7 @@ pub unsafe extern "C" fn tl_preset_default(
     let mut preset = Preset::new(title);
     if let Ok(date) = from_1900_ms(now_1900_ms).and_then(DateTime::from_epoch_ms) {
         preset.target = date;
+        preset.target.millisecond = 0;
     }
     copy_preset(preset, output, capacity)
 }

@@ -46,6 +46,7 @@ enum Gen7View {
 }
 
 struct PersistedState {
+    observed_seed: Option<u32>,
     sfmt: RngWrapper<Sfmt64>,
     sos_rng: RngWrapper<Sfmt32>,
     show_view: ShowView,
@@ -73,6 +74,7 @@ const MENU: &[MenuOption<Gen7View>] = &[
 
 unsafe fn get_state() -> &'static mut PersistedState {
     static mut STATE: Lazy<PersistedState> = Lazy::new(|| PersistedState {
+        observed_seed: None,
         sfmt: RngWrapper::default(),
         sos_rng: RngWrapper::default(),
         show_view: ShowView::default(),
@@ -94,7 +96,12 @@ fn run_frame(reader: Gen7Reader) {
     // A lock hinders performance too much on a 3ds.
     let state = unsafe { get_state() };
 
-    state.sfmt.reinit_if_needed(reader.init_seed());
+    let init_seed = reader.init_seed();
+    if state.observed_seed != Some(init_seed) {
+        crate::time_lock::observe_seed(init_seed);
+        state.observed_seed = Some(init_seed);
+    }
+    state.sfmt.reinit_if_needed(init_seed);
     state.sfmt.update_advances(reader.sfmt_state());
 
     if !state.show_view.check() {

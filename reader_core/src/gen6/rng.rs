@@ -3,6 +3,7 @@ use crate::rng::{RngWrapper, TinyMT, MT};
 
 #[derive(Default)]
 pub struct Gen6Rng {
+    observed_seed: Option<u32>,
     mt: RngWrapper<MT>,
     tinymt: RngWrapper<TinyMT>,
 }
@@ -10,8 +11,9 @@ pub struct Gen6Rng {
 impl Gen6Rng {
     pub fn update(&mut self, reader: &Gen6Reader) {
         let init_seed = reader.initial_seed();
-        if self.mt.init_seed() != init_seed {
+        if self.observed_seed != Some(init_seed) {
             crate::time_lock::observe_seed(init_seed);
+            self.observed_seed = Some(init_seed);
         }
         let mt_state = reader.mt_state();
         let tinymt_seed = reader.tinymt_seed();

@@ -15,11 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m unittest discover -s tests -v
+      - name: Exercise SD journal interruptions
+        run: |
+          cc -std=c11 -Wall -Wextra -Wno-pointer-to-int-cast -Itests/mock -I3gx/includes tests/test_time_lock_io.c 3gx/sources/time_lock_io.c -o /tmp/test-time-lock-io
+          /tmp/test-time-lock-io
 
   lint-test-build:
     name: Lint, test, and build
     runs-on: ubuntu-latest
-    container: zaksabeast/devkitarm-rust
+    container: zaksabeast/devkitarm-rust@sha256:f0281f83cf4c072804a637d094ecabb83108234dbca309a027187cf4d5d6a990
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,14 +51,19 @@ jobs:
           {
             rustc +nightly-2024-03-21 --version
             arm-none-eabi-gcc --version
-            cat /opt/devkitpro/libctru/include/3ds/version.h
+            if command -v dkp-pacman > /dev/null; then dkp-pacman -Q libctru; fi
+            sha256sum /opt/devkitpro/libctru/lib/libctru.a
+            sha256sum "$(command -v 3gxtool)"
+            git rev-parse HEAD
             sha256sum out/default.3gx out/PokeReader-Time.3dsx
           } > out/build-info.txt
           cp baseline-build.txt out/
+          cp docs/time-lock-development.zh-CN.md out/README-zh-CN.md
+          cp profiles/manifest.json out/adapter-status.json
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PokeReader
-          retention-days: 3
+          retention-days: 14
           path: out/

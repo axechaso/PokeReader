@@ -7,10 +7,10 @@ H_SRCS := $(shell find 3gx/includes -name '*.h')
 
 all: out/default.3gx out/PokeReader-Time.3dsx
 
-$(LIBPOKEREADER): $(R_SRCS)
+$(LIBPOKEREADER): $(R_SRCS) reader_core/Cargo.toml reader_core/Cargo.lock reader_core/build.rs time_lock_core/Cargo.toml
 	cargo +nightly-2024-03-21 build --locked --release -Z build-std=core,alloc --target armv6k-nintendo-3ds --manifest-path reader_core/Cargo.toml
 
-out/default.3gx: $(LIBPOKEREADER) $(C_SRCS) $(H_SRCS)
+out/default.3gx: $(LIBPOKEREADER) $(C_SRCS) $(H_SRCS) 3gx/PokeReader.plgInfo 3gx/Makefile 3gx/3gx.ld
 	make clean -C 3gx
 	make -C 3gx
 	mkdir -p out
