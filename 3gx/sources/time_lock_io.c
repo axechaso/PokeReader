@@ -6,12 +6,19 @@
 #define TL_MAX_PRESET 512
 
 static Handle state_mutex;
+static bool state_mutex_ready;
 
-Result host_tl_platform_init(void) { return svcCreateMutex(&state_mutex, false); }
+Result host_tl_platform_init(void)
+{
+    if (state_mutex_ready) return 0;
+    Result result = svcCreateMutex(&state_mutex, false);
+    state_mutex_ready = R_SUCCEEDED(result);
+    return result;
+}
 u64 host_tl_tick(void) { return svcGetSystemTick(); }
 s64 host_tl_real_ms(void) { return (s64)osGetTime(); }
-void host_tl_lock(void) { svcWaitSynchronization(state_mutex, U64_MAX); }
-void host_tl_unlock(void) { svcReleaseMutex(state_mutex); }
+void host_tl_lock(void) { if (state_mutex_ready) svcWaitSynchronization(state_mutex, U64_MAX); }
+void host_tl_unlock(void) { if (state_mutex_ready) svcReleaseMutex(state_mutex); }
 
 static Result open_sd(FS_Archive *archive)
 {

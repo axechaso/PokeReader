@@ -67,48 +67,8 @@ fn initialize_loaded_title(title: &LoadedTitle) {
 #[no_mangle]
 pub extern "C" fn initialize() {
     if let Ok(title) = loaded_title() {
-        if time_lock_core::preset::TITLES
-            .iter()
-            .any(|(id, _, _)| *id == *title as u64)
-        {
-            time_lock::initialize();
-        }
         initialize_loaded_title(title);
     }
-}
-
-/// 0=unrelated title, 1=allowed, 2=version/fingerprint mismatch, 3=hook mismatch.
-/// Called before C installs any overlay or game-specific hooks.
-#[no_mangle]
-pub extern "C" fn reader_startup_status() -> u32 {
-    let title = match loaded_title() {
-        Ok(title) => title,
-        Err(TitleError::InvalidTitle) => return 0,
-        Err(_) => return 2,
-    };
-    let (branches, nop): (&[u32], Option<u32>) = match title {
-        LoadedTitle::X | LoadedTitle::Y => (&[0x11e880], Some(0x1254f8)),
-        LoadedTitle::Or | LoadedTitle::As => (&[0x1122fc], Some(0x125ec8)),
-        LoadedTitle::S | LoadedTitle::M => (&[0x359784, 0x3eab60], None),
-        LoadedTitle::Us => (&[0x361e60, 0x3fcbbc], None),
-        LoadedTitle::Um => (&[0x361e60, 0x3fcbc0], None),
-        _ => return 1,
-    };
-    for &address in branches {
-        if !pnp::is_memory_mapped(address) || pnp::read::<u32>(address) >> 24 != 0xeb {
-            return 3;
-        }
-    }
-    if let Some(address) = nop {
-        if !pnp::is_memory_mapped(address) {
-            return 3;
-        }
-        let word: u32 = pnp::read(address);
-        if word != 0xe1a00000 && word != 0xe320f000 {
-            return 3;
-        }
-    }
-    1
 }
 
 fn run_loaded_title_frame(title: &LoadedTitle) {

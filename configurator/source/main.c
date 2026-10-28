@@ -27,7 +27,9 @@ static s32 load(unsigned selected, const char **message)
 int main(void)
 {
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    PrintConsole top_screen;
+    consoleInit(GFX_TOP, &top_screen);
+    consoleSelect(&top_screen);
     if (R_FAILED(host_tl_platform_init())) { gfxExit(); return 1; }
     unsigned selected = 6, field = 0;
     const char *message = "";
@@ -56,12 +58,12 @@ int main(void)
             else message = "Save failed. Previous preset retained.";
         }
         consoleClear();
-        printf("PokeReader Time - DEVELOPMENT\n\n");
+        printf("PokeReader Time - DEV\n\n");
         printf("Game: %s%s\n", names[selected], dirty ? " *" : "");
-        printf("Game clock adapters: UNVERIFIED\nThis editor does not change system time.\n\n");
+        printf("Clock adapter: UNVERIFIED\nNo system-clock changes.\n\n");
         if (length > 0) { preset[length] = 0; printf("%s\n", preset); }
         printf("Field: %s\n\n", fields[field]);
-        printf("Left/Right: game   L/R: field\nUp/Down: edit      A: save\nB: discard/reload  START: exit\n\n%s\n", message);
+        printf("Left/Right: game  L/R: field\nUp/Down: edit     A: save\nB: reload         START: exit\n\n%s\n", message);
         gfxFlushBuffers();
         gfxSwapBuffers();
         gspWaitForVBlank();

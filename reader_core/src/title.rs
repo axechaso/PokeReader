@@ -96,23 +96,12 @@ fn get_update_version(title: LoadedTitle) -> UpdateInfo {
         return get_citra_title_version(title);
     }
 
-    let reported = pnp::update_version();
-    // Check the same per-title code fingerprint on hardware, before any write.
-    // Upstream's Citra-only check previously left hardware relying on metadata alone.
-    let code = get_citra_title_version(title);
-    if time_lock_core::preset::TITLES
-        .iter()
-        .any(|(id, _, _)| *id == title as u64)
-        && code.version != reported
-    {
-        return UpdateInfo {
-            version: 0,
-            debug_info: code.debug_info,
-        };
-    }
+    // The fixed-address fingerprint is valid only in Citra's address layout.
+    // Real hardware continues to use the upstream FS metadata path until a
+    // hardware-specific code fingerprint has been verified.
     UpdateInfo {
-        version: reported,
-        debug_info: code.debug_info,
+        version: pnp::update_version(),
+        debug_info: None,
     }
 }
 

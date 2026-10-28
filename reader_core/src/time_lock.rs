@@ -10,6 +10,7 @@ use time_lock_core::{
 };
 
 extern "C" {
+    fn host_tl_platform_init() -> i32;
     fn host_tl_tick() -> u64;
     fn host_tl_real_ms() -> i64;
     fn host_tl_lock();
@@ -37,6 +38,7 @@ impl Drop for Guard {
 
 static mut TRACE: Trace<TRACE_CAPACITY> = Trace::new();
 static mut SESSION: u64 = 0;
+static mut PLATFORM_READY: bool = false;
 
 fn tick() -> u64 {
     unsafe { host_tl_tick() }
@@ -51,22 +53,18 @@ fn observe(event: Event, game_ms: i64, value: u64) {
     let real_ms = real_ms();
     let _guard = Guard::lock();
     unsafe {
+        if SESSION == 0 {
+            SESSION = tick;
+        }
         TRACE.push(Observation {
             event,
-            session: 1,
+            session: SESSION as u32,
             tick,
             real_ms,
             game_ms,
             value,
         });
     }
-}
-
-pub fn initialize() {
-    unsafe {
-        SESSION = tick();
-    }
-    observe(Event::Startup, -1, pnp::title_id());
 }
 
 /// This is the existing Gen 7 seeding context, NOT a proven calendar-read hook.
@@ -309,6 +307,15 @@ impl Editor {
 }
 
 pub fn update_and_draw(is_locked: bool) {
+    unsafe {
+        if !PLATFORM_READY {
+            let _ = host_tl_platform_init();
+            PLATFORM_READY = true;
+        }
+        if SESSION == 0 {
+            SESSION = tick();
+        }
+    }
     // Same frame-thread ownership as the existing PokeReader menus.
     static mut EDITOR: Option<Editor> = None;
     let editor = unsafe { EDITOR.get_or_insert_with(Editor::new) };
