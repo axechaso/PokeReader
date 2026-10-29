@@ -27,8 +27,15 @@ static s32 load(unsigned selected, const char **message)
 int main(void)
 {
     gfxInitDefault();
+    // The editor is a normal 2D top-screen app. Explicitly reset these modes
+    // so it cannot inherit a wide/3D framebuffer layout on some firmware.
+    gfxSetWide(false);
+    gfxSet3D(false);
     PrintConsole top_screen;
     consoleInit(GFX_TOP, &top_screen);
+    // Keep a known 1-based window with a margin and a standard-width layout.
+    // This avoids clipped first columns when the runtime console state differs.
+    consoleSetWindow(&top_screen, 2, 1, 46, 28);
     consoleSelect(&top_screen);
     if (R_FAILED(host_tl_platform_init())) { gfxExit(); return 1; }
     unsigned selected = 6, field = 0;
@@ -57,6 +64,7 @@ int main(void)
             if (host_tl_save(titles[selected], preset, length) == 0) { dirty = false; message = "Saved. Clock adapter is unverified."; }
             else message = "Save failed. Previous preset retained.";
         }
+        consoleSelect(&top_screen);
         consoleClear();
         printf("PokeReader Time - DEV\n\n");
         printf("Game: %s%s\n", names[selected], dirty ? " *" : "");
