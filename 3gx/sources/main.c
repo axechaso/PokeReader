@@ -10,6 +10,7 @@
 #include "title_info.h"
 #include "hid.h"
 #include "memmem.h"
+#include "time_lock.h"
 
 static Handle thread;
 static Handle memLayoutChanged;

@@ -8,10 +8,13 @@ jobs:
   canary-release:
     name: Canary release
     runs-on: ubuntu-latest
-    container: zaksabeast/devkitarm-rust
+    container: zaksabeast/devkitarm-rust@sha256:f0281f83cf4c072804a637d094ecabb83108234dbca309a027187cf4d5d6a990
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - name: Lint and test
+        run: make lint test
 
       - name: Build
         run: make
@@ -32,4 +35,7 @@ jobs:
           tag_name: ${{ steps.tag_name.outputs.tag_name }}
           name: ${{ format('Canary {0}', steps.build_timestamp.outputs.build_timestamp) }}
           body: ${{ github.event.head_commit.message }}
-          files: out/default.3gx
+          files: |
+            out/default.3gx
+            out/PokeReader-Time.3dsx
+            docs/time-lock-development.zh-CN.md

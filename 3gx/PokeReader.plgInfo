@@ -21,12 +21,14 @@ Targets: # Low TitleId of games which are compatibles with this plugin (empty fo
     0x00173100
     0x00173400
 
-Title: PokeReader
+Title: PokeReader Time (dev)
 
-Summary: Read Pokemon from 3ds titles
+Summary: RNG reader and time-control development tools
 
 Description: |
   Read Pokemon from 3ds titles
+  Time preview, preset editor and seed diagnostics.
+  No verified game clock adapter is included.
 
 Compatibility: Any
 MemorySize: 5MiB

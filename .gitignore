@@ -20,3 +20,10 @@ build/
 
 .idea
 .vscode
+
+# Local inspection data and Python caches (never distribute game code)
+__pycache__/
+*.pyc
+*.code.bin
+code.bin
+research-inputs/

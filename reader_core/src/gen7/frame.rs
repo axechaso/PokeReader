@@ -42,9 +42,11 @@ enum Gen7View {
     Pelago,
     Citra,
     HelpMenu,
+    TimeControl,
 }
 
 struct PersistedState {
+    observed_seed: Option<u32>,
     sfmt: RngWrapper<Sfmt64>,
     sos_rng: RngWrapper<Sfmt32>,
     show_view: ShowView,
@@ -66,11 +68,13 @@ const MENU: &[MenuOption<Gen7View>] = &[
     MenuOption::new(Gen7View::Box, "Box"),
     MenuOption::new(Gen7View::Pelago, "Pelago"),
     MenuOption::new(Gen7View::Citra, "Citra"),
+    MenuOption::new(Gen7View::TimeControl, "Time control (dev)"),
     MenuOption::new(Gen7View::HelpMenu, "Help"),
 ];
 
 unsafe fn get_state() -> &'static mut PersistedState {
     static mut STATE: Lazy<PersistedState> = Lazy::new(|| PersistedState {
+        observed_seed: None,
         sfmt: RngWrapper::default(),
         sos_rng: RngWrapper::default(),
         show_view: ShowView::default(),
@@ -92,7 +96,12 @@ fn run_frame(reader: Gen7Reader) {
     // A lock hinders performance too much on a 3ds.
     let state = unsafe { get_state() };
 
-    state.sfmt.reinit_if_needed(reader.init_seed());
+    let init_seed = reader.init_seed();
+    if state.observed_seed != Some(init_seed) {
+        crate::time_lock::observe_seed(init_seed);
+        state.observed_seed = Some(init_seed);
+    }
+    state.sfmt.reinit_if_needed(init_seed);
     state.sfmt.update_advances(reader.sfmt_state());
 
     if !state.show_view.check() {
@@ -132,6 +141,7 @@ fn run_frame(reader: Gen7Reader) {
             draw_pkx(&reader.pelago_pkm((slot - 1) as u32), PkxType::Wild)
         }
         Gen7View::HelpMenu => state.help_menu.update_and_draw(is_locked),
+        Gen7View::TimeControl => crate::time_lock::update_and_draw(is_locked),
         Gen7View::MainMenu => {
             state.main_menu.update_view();
             state.main_menu.draw();

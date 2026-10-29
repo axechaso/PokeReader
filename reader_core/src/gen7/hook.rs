@@ -43,6 +43,7 @@ fn init_main_rng_hook(_regs: &[u32], stack_pointer: *mut u32) {
     let console_ms_epoch_low = unsafe { stack_pointer.add(12).read() };
     let console_ms_epoch_high = unsafe { stack_pointer.add(13).read() };
     let console_ms_epoch = ((console_ms_epoch_high as u64) << 32) | (console_ms_epoch_low as u64);
+    crate::time_lock::observe_seed_input(console_ms_epoch, ticks);
     // Assume we didn't start with any milliseconds and any extra milliseconds was spent loading
     let start_ms = (pnp::game_start_ms() / 1000) * 1000;
     // Citra has a one second delay when loading 3gx plugins: https://github.com/citra-emu/citra/blob/0ff3440232d6bc9226e37c41c05c5aead03f37fd/src/core/file_sys/plugin_3gx_bootloader.h#L59-L64

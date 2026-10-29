@@ -8,6 +8,12 @@ PokeReader is a 3gx plugin that allows viewing information about 3ds Pokemon gam
 
 This information can be used to RNG shiny and high IV Pokemon, similar to lua scripts on emulators.
 
+## Time-control development build
+
+This fork adds a **Time control (dev)** menu, strict per-game date presets, an offline clock laboratory, seed diagnostics, and a native `.3dsx` preset editor. **Retail game clocks remain unchanged:** no calendar-read adapter has passed first-read and hardware validation yet. Time-penalty bypass and automatic soft-reset handling are not enabled.
+
+See the [Chinese development guide](docs/time-lock-development.zh-CN.md) for installation, controls, testing and the remaining acceptance work. Existing RNG views and frame controls remain available on recognized builds. Game version, code identity probes and hook shapes are checked before installation.
+
 ## Commands
 
 - Start + Up (D-Pad): Show/Hide the plugin
