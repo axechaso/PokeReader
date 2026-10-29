@@ -33,6 +33,10 @@ int main(void)
     gfxSet3D(false);
     PrintConsole top_screen;
     consoleInit(GFX_TOP, &top_screen);
+    // consoleInit uses a single visible buffer. The editor redraws every
+    // frame, so use the normal double-buffer path and refresh the console's
+    // draw pointer after each swap to avoid showing a partially cleared frame.
+    gfxSetDoubleBuffering(GFX_TOP, true);
     // Keep a known 1-based window with a margin and a standard-width layout.
     // This avoids clipped first columns when the runtime console state differs.
     consoleSetWindow(&top_screen, 2, 1, 46, 28);
@@ -66,6 +70,7 @@ int main(void)
             if (host_tl_save(titles[selected], preset, length) == 0) { dirty = false; message = "Saved. Clock adapter is unverified."; }
             else message = "Save failed. Previous preset retained.";
         }
+        top_screen.frameBuffer = (u16 *)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
         consoleSelect(&top_screen);
         consoleClear();
         printf("PokeReader Time - DEV\n\n");
