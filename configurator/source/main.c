@@ -38,7 +38,9 @@ int main(void)
     consoleSetWindow(&top_screen, 2, 1, 46, 28);
     consoleSelect(&top_screen);
     if (R_FAILED(host_tl_platform_init())) { gfxExit(); return 1; }
-    unsigned selected = 6, field = 0;
+    // Start with Pokemon X so the first hardware test matches the current
+    // validation target; Right switches to Y and the other supported titles.
+    unsigned selected = 0, field = 0;
     const char *message = "";
     s32 length = load(selected, &message);
     bool dirty = false;
