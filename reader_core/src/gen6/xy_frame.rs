@@ -80,6 +80,7 @@ pub fn run_xy_frame() {
         state.memory_ready = true;
     }
 
+    crate::time_lock::apply_y_game_time_lock();
     crate::time_lock::observe_y_game_time_cache();
     state.rng.update(&reader);
 

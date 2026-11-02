@@ -1,4 +1,4 @@
-//! Development UI and read-only seed diagnostics. No retail clock adapter is enabled.
+//! Development UI, cache diagnostics, and a controlled Y cache-write experiment.
 use crate::pnp::{self, Button};
 use alloc::{format, string::String};
 use core::fmt::Write;
@@ -40,6 +40,7 @@ static mut TRACE: Trace<TRACE_CAPACITY> = Trace::new();
 static mut SESSION: u64 = 0;
 static mut PLATFORM_READY: bool = false;
 static mut LAST_Y_GAME_TIME_CACHE: u64 = u64::MAX;
+static mut Y_GAME_TIME_LOCK_TARGET: Option<u64> = None;
 
 const Y_TITLE_ID: u64 = 0x0004000000055E00;
 const Y_GAME_TIME_CACHE: u32 = 0x005D45E0;
@@ -84,12 +85,44 @@ pub fn observe_seed(seed: u32) {
     observe(Event::SeedObserved, -1, u64::from(seed));
 }
 
+fn y_title_loaded() -> bool {
+    pnp::title_id() == Y_TITLE_ID
+        && matches!(crate::title::loaded_title(), Ok(crate::title::LoadedTitle::Y))
+}
+
+fn set_y_game_time_lock(preset: &Preset) {
+    let target = if y_title_loaded()
+        && preset.enabled
+        && preset.initial_mode == Mode::Frozen
+        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE)
+        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE + 7)
+    {
+        preset.target.to_epoch_ms().ok().and_then(|value| u64::try_from(value).ok())
+    } else {
+        None
+    };
+    unsafe {
+        Y_GAME_TIME_LOCK_TARGET = target;
+    }
+}
+
+pub fn apply_y_game_time_lock() {
+    let target = unsafe { Y_GAME_TIME_LOCK_TARGET };
+    if let Some(target) = target {
+        pnp::write_slice(Y_GAME_TIME_CACHE, &target.to_le_bytes());
+    }
+}
+
+fn y_game_time_lock_active() -> bool {
+    unsafe { Y_GAME_TIME_LOCK_TARGET.is_some() }
+}
+
 /// Read-only diagnostic for the Pokémon Y update-5 calendar cache.
 /// The address and value are recorded only when the cache changes; no game
 /// memory is written and no adapter is installed.
 pub fn observe_y_game_time_cache() {
     if pnp::title_id() != Y_TITLE_ID
-        || !matches!(crate::title::loaded_title(), Ok(crate::title::LoadedTitle::Y))
+        || !y_title_loaded()
         || !pnp::is_memory_mapped(Y_GAME_TIME_CACHE)
         || !pnp::is_memory_mapped(Y_GAME_TIME_CACHE + 7)
     {
@@ -155,8 +188,13 @@ fn export_trace() -> bool {
         let _guard = Guard::lock();
         unsafe { (TRACE, SESSION) }
     };
-    let mut text = format!("# PokeReader {} {}\n# title={:016X},remaster={},session={}\n# game_clock=original,adapter=unverified,dropped={}\n# real_ms_epoch=1900,game_ms_epoch=2000,unknown_game_ms=-1\nevent,session,tick,real_ms,game_ms,value\n",
-        crate::VERSION, crate::GIT_HASH, pnp::title_id(), pnp::update_version(), session, trace.dropped());
+    let clock_mode = if y_game_time_lock_active() {
+        "test-cache-write"
+    } else {
+        "original"
+    };
+    let mut text = format!("# PokeReader {} {}\n# title={:016X},remaster={},session={}\n# game_clock={},adapter=unverified,dropped={}\n# real_ms_epoch=1900,game_ms_epoch=2000,unknown_game_ms=-1\nevent,session,tick,real_ms,game_ms,value\n",
+        crate::VERSION, crate::GIT_HASH, pnp::title_id(), pnp::update_version(), session, clock_mode, trace.dropped());
     for entry in trace.entries() {
         let _ = writeln!(
             text,
@@ -201,7 +239,7 @@ impl Editor {
             preset.initial_mode,
             tick(),
         );
-        Self {
+        let editor = Self {
             preset,
             preview,
             field: 0,
@@ -209,7 +247,9 @@ impl Editor {
             message,
             dirty: false,
             fault: false,
-        }
+        };
+        set_y_game_time_lock(&editor.preset);
+        editor
     }
 
     fn edit(&mut self, delta: i16) {
@@ -254,7 +294,14 @@ impl Editor {
             self.edit(-1);
         } else if pnp::is_just_pressed(Button::A) {
             if save_preset(self.preset) {
-                self.message = "Saved; adapter still unavailable";
+                set_y_game_time_lock(&self.preset);
+                self.message = if y_game_time_lock_active() {
+                    "Saved; TEST cache lock enabled"
+                } else if self.preset.enabled && self.preset.initial_mode == Mode::Running {
+                    "Saved; test lock requires Frozen mode"
+                } else {
+                    "Saved; adapter still unavailable"
+                };
                 self.dirty = false;
             } else {
                 self.message = "Save failed; previous preset kept";
@@ -299,7 +346,14 @@ impl Editor {
     fn draw(&mut self, is_locked: bool) {
         pnp::set_print_max_len(40);
         pnp::println!("Time control - DEVELOPMENT");
-        pnp::println!("Game clock: ORIGINAL (no adapter)");
+        pnp::println!(
+            "Game clock: {}",
+            if y_game_time_lock_active() {
+                "TEST FROZEN (cache write)"
+            } else {
+                "ORIGINAL (no adapter)"
+            }
+        );
         pnp::println!(
             "Next boot{}: {}",
             if self.dirty { "*" } else { "" },
@@ -325,6 +379,9 @@ impl Editor {
         pnp::println!("A save; X preview freeze/run");
         pnp::println!("B step; SELECT reset; Y export log");
         pnp::println!("Penalty: observe only; soft reset: off");
+        if y_game_time_lock_active() {
+            pnp::println!("TEST writes 0x005D45E0 every frame");
+        }
         pnp::println!("{}", self.message);
         if is_locked {
             pnp::println!("Inputs locked (X+Y to unlock)");
