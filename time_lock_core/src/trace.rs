@@ -6,6 +6,7 @@ pub enum Event {
     SeedObserved,
     PreviewCommand,
     ClockFault,
+    GameTimeCache,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

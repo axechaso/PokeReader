@@ -39,6 +39,10 @@ impl Drop for Guard {
 static mut TRACE: Trace<TRACE_CAPACITY> = Trace::new();
 static mut SESSION: u64 = 0;
 static mut PLATFORM_READY: bool = false;
+static mut LAST_Y_GAME_TIME_CACHE: u64 = u64::MAX;
+
+const Y_TITLE_ID: u64 = 0x0004000000055E00;
+const Y_GAME_TIME_CACHE: u32 = 0x005D45E0;
 
 fn tick() -> u64 {
     unsafe { host_tl_tick() }
@@ -78,6 +82,28 @@ pub fn observe_seed_input(game_ms: u64, seed_ticks: u32) {
 
 pub fn observe_seed(seed: u32) {
     observe(Event::SeedObserved, -1, u64::from(seed));
+}
+
+/// Read-only diagnostic for the Pokémon Y update-5 calendar cache.
+/// The address and value are recorded only when the cache changes; no game
+/// memory is written and no adapter is installed.
+pub fn observe_y_game_time_cache() {
+    if pnp::title_id() != Y_TITLE_ID
+        || !matches!(crate::title::loaded_title(), Ok(crate::title::LoadedTitle::Y))
+        || !pnp::is_memory_mapped(Y_GAME_TIME_CACHE)
+        || !pnp::is_memory_mapped(Y_GAME_TIME_CACHE + 7)
+    {
+        return;
+    }
+    let bytes = pnp::read_array::<8>(Y_GAME_TIME_CACHE);
+    let value = u64::from_le_bytes(bytes);
+    unsafe {
+        if LAST_Y_GAME_TIME_CACHE == value {
+            return;
+        }
+        LAST_Y_GAME_TIME_CACHE = value;
+    }
+    observe(Event::GameTimeCache, i64::try_from(value).unwrap_or(-1), value);
 }
 
 fn load_preset(title: u64) -> (Preset, &'static str) {
