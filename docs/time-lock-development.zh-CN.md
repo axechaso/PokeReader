@@ -39,7 +39,7 @@
 
 编辑下一次启动的目标不会立即改变现有预览。SELECT 才会按新目标重置预览。START+SELECT 仍是原有游戏暂停组合；预览控制不修改游戏 RNG。
 
-`Request next boot`、初始模式与重复使用开关会写入预设。默认情况下界面显示 `Game clock: ORIGINAL (no adapter)`；Y 更新 5 在保存 `Request: true` 且 `Initial mode: Frozen` 后会显示 `TEST FROZEN (cache + seed hook)`，每帧把目标毫秒值写入已验证的 `0x005D45E0`，并在初始 seed 的时间调用处使用同一目标值。插件在 Y 的游戏内存就绪后会自动读取已保存的预设，因此完整重启后也会重新启用；关闭 Request 或重启插件即可停用。这是临时的内存实验，不是已发布的适配器，不改写存档。原有暂停、逐帧和 RNG 页面可继续使用。
+`Request next boot`、初始模式与重复使用开关会写入预设。默认情况下界面显示 `Game clock: ORIGINAL (no adapter)`；Y 更新 5 在保存 `Request: true` 且 `Initial mode: Frozen` 后会显示 `TEST FROZEN (cache + seed hook)`，每帧把目标毫秒值写入已验证的 `0x005D45E0`，并在初始 seed 的时间调用处使用同一目标值。插件在 Y 的首帧读取已保存的预设；保存后使用软重启或返回标题即可让当前进程重新生成 seed 并使用锁定值。完整重启后的首个 seed 仍需单独验证；关闭 Request 或重启插件即可停用。这是临时的内存实验，不是已发布的适配器，不改写存档。原有暂停、逐帧和 RNG 页面可继续使用。
 
 运行模式预览按平台 tick 前进；休眠覆盖、HOME 恢复和实际游戏时钟语义均未通过实机验收。出现计时倒退或越界会报错，SELECT 可重新开始预览。
 

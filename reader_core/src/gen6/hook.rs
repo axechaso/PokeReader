@@ -21,7 +21,6 @@ fn init_xy_hooks() {
 
 fn init_y_hooks() {
     if crate::pnp::is_memory_mapped(0x10da38) && crate::pnp::read::<u32>(0x10da38) == 0xeb00e54e {
-        crate::time_lock::activate_saved_y_game_time_lock();
         utils::hook_game_branch_skip! {
             game_name = xy,
             normal = init_tinymt_hook = 0x11e880,
