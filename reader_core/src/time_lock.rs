@@ -44,6 +44,7 @@ static mut Y_GAME_TIME_LOCK_TARGET: Option<u64> = None;
 static mut Y_GAME_TIME_PRESET_LOADED: bool = false;
 static mut LAST_Y_SEED_TIME_HOOK_LOCKED: Option<bool> = None;
 static mut PENDING_Y_SEED_TIME_HOOK: Option<(i64, bool)> = None;
+static mut Y_SEED_TIME_HOOK_ARMED: bool = false;
 
 const Y_TITLE_ID: u64 = 0x0004000000055E00;
 const Y_GAME_TIME_CACHE: u32 = 0x005D45E0;
@@ -104,6 +105,7 @@ fn set_y_game_time_lock(preset: &Preset) {
     };
     unsafe {
         Y_GAME_TIME_LOCK_TARGET = target;
+        Y_SEED_TIME_HOOK_ARMED = false;
     }
 }
 
@@ -116,8 +118,7 @@ fn ensure_platform_ready() {
     }
 }
 
-/// Loads the saved Y preset once the game memory is ready so a saved request
-/// also takes effect after a complete game/plugin restart.
+/// Loads the saved Y preset once the game memory is ready for later seed resets.
 pub fn activate_saved_y_game_time_lock() {
     if pnp::title_id() != Y_TITLE_ID {
         unsafe {
@@ -125,6 +126,7 @@ pub fn activate_saved_y_game_time_lock() {
             Y_GAME_TIME_LOCK_TARGET = None;
             LAST_Y_SEED_TIME_HOOK_LOCKED = None;
             PENDING_Y_SEED_TIME_HOOK = None;
+            Y_SEED_TIME_HOOK_ARMED = false;
         }
         return;
     }
@@ -157,23 +159,35 @@ fn observe_seed_time_hook(game_ms: i64, locked: bool) {
     }
 }
 
+pub fn arm_y_seed_time_hook() {
+    unsafe {
+        if Y_GAME_TIME_LOCK_TARGET.is_some() {
+            Y_SEED_TIME_HOOK_ARMED = true;
+        }
+    }
+}
+
 /// Called by the Y seed-generation branch hook. Returning true tells the
 /// shared branch trampoline to skip the original time function.
 pub fn override_y_seed_time_call(regs: &mut [u32]) -> bool {
     let target = unsafe { Y_GAME_TIME_LOCK_TARGET };
+    let armed = unsafe { Y_SEED_TIME_HOOK_ARMED };
     if let Some(target) = target {
+        if !armed {
+            unsafe {
+                PENDING_Y_SEED_TIME_HOOK = Some((-1, false));
+            }
+            return false;
+        }
         let output_address = regs.first().copied().unwrap_or(0);
         if output_address != 0 {
-            if let Some(output_end) = output_address.checked_add(7) {
-                if pnp::is_memory_mapped(output_address) && pnp::is_memory_mapped(output_end) {
-                    let output = output_address as *mut u64;
-                    unsafe { core::ptr::write_unaligned(output, target) };
-                    unsafe {
-                        PENDING_Y_SEED_TIME_HOOK = Some((i64::try_from(target).unwrap_or(-1), true));
-                    }
-                    return true;
-                }
+            let output = output_address as *mut u64;
+            unsafe {
+                core::ptr::write_unaligned(output, target);
+                Y_SEED_TIME_HOOK_ARMED = false;
+                PENDING_Y_SEED_TIME_HOOK = Some((i64::try_from(target).unwrap_or(-1), true));
             }
+            return true;
         }
     }
     unsafe {
