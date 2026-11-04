@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "release_channel": "development",
+  "game_clock_adapters": [],
+  "note": "No retail calendar-read entry or first-read coverage has been verified. Presets and preview do not change game time."
+}

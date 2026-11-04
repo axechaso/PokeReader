@@ -39,6 +39,12 @@ static mut LOAD_RESULT: Result<LoadedTitle, TitleError> = Err(TitleError::Invali
 // the running game is the latest version by checking a known, unique
 // 16-byte value located at a fixed address in the game's memory.
 fn check_citra_title_version(addr: u32, expected: &'static [u8; 16], version: u16) -> UpdateInfo {
+    if !pnp::is_memory_mapped(addr) || !pnp::is_memory_mapped(addr + 15) {
+        return UpdateInfo {
+            version: 0,
+            debug_info: Some(String::from("Code fingerprint unmapped")),
+        };
+    }
     let version_bytes = pnp::read_array::<16>(addr);
     let version = match &version_bytes == expected {
         true => version,
@@ -90,6 +96,9 @@ fn get_update_version(title: LoadedTitle) -> UpdateInfo {
         return get_citra_title_version(title);
     }
 
+    // The fixed-address fingerprint is valid only in Citra's address layout.
+    // Real hardware continues to use the upstream FS metadata path until a
+    // hardware-specific code fingerprint has been verified.
     UpdateInfo {
         version: pnp::update_version(),
         debug_info: None,

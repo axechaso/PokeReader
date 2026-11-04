@@ -150,5 +150,5 @@ bool is_memory_mapped(u32 addr) {
   MemInfo info;
   PageInfo page;
   s32 result = svcQueryMemory(&info, &page, addr);
-  return result == 0;
+  return result == 0 && info.size > 0 && (info.perm & MEMPERM_READ) != 0;
 }

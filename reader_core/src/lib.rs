@@ -13,6 +13,7 @@ mod gen6;
 mod gen7;
 mod pnp;
 mod rng;
+mod time_lock;
 mod title;
 mod transporter;
 mod utils;
