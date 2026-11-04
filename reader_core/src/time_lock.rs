@@ -42,7 +42,7 @@ static mut PLATFORM_READY: bool = false;
 static mut LAST_Y_GAME_TIME_CACHE: u64 = u64::MAX;
 static mut Y_GAME_TIME_LOCK_TARGET: Option<u64> = None;
 static mut Y_GAME_TIME_PRESET_LOADED: bool = false;
-static mut Y_SEED_TIME_HOOK_LOGGED: bool = false;
+static mut LAST_Y_SEED_TIME_HOOK_LOCKED: Option<bool> = None;
 
 const Y_TITLE_ID: u64 = 0x0004000000055E00;
 const Y_GAME_TIME_CACHE: u32 = 0x005D45E0;
@@ -122,7 +122,7 @@ pub fn activate_saved_y_game_time_lock() {
         unsafe {
             Y_GAME_TIME_PRESET_LOADED = false;
             Y_GAME_TIME_LOCK_TARGET = None;
-            Y_SEED_TIME_HOOK_LOGGED = false;
+            LAST_Y_SEED_TIME_HOOK_LOCKED = None;
         }
         return;
     }
@@ -155,10 +155,10 @@ pub fn apply_y_game_time_lock() {
 
 fn observe_seed_time_hook(game_ms: i64, locked: bool) {
     let should_log = unsafe {
-        if Y_SEED_TIME_HOOK_LOGGED {
+        if LAST_Y_SEED_TIME_HOOK_LOCKED == Some(locked) {
             false
         } else {
-            Y_SEED_TIME_HOOK_LOGGED = true;
+            LAST_Y_SEED_TIME_HOOK_LOCKED = Some(locked);
             true
         }
     };

@@ -103,7 +103,7 @@ quit
 
 在 Time control 页面选择目标日期，切换 `Request next boot` 为 `true`，保持 `Initial mode` 为 `Frozen`，按 A 保存。保存成功后界面会显示 `TEST FROZEN (cache + seed hook)`。此时插件把目标的 2000-01-01 纪元毫秒值写入 seed 时间调用的输出，并每帧写入 `0x005D45E0`，同时继续记录 `SeedTimeHook` 与 `GameTimeCache`。
 
-实验顺序：先在当前日期记录一次原始 CSV，再启用测试锁，完整重启并让游戏重新生成 seed，然后记录 CSV。锁定记录应包含 `# game_clock=test-seed-time-and-cache` 和一条 `SeedTimeHook,...,game_ms=<目标毫秒>,value=1`，`GameTimeCache` 也应保持在目标值。随后做一次完整重启、HOME/休眠恢复和每日事件检查。出现崩溃、日期异常或事件不同步时，立即把 `Request next boot` 设为 `false` 并保存，恢复原始时钟。
+实验顺序：先在当前日期记录一次原始 CSV，再启用测试锁，使用软重启，或从存档返回标题后重新进入存档页面，让游戏重新生成 seed，然后记录 CSV。锁定记录应包含 `# game_clock=test-seed-time-and-cache` 和一条 `SeedTimeHook,...,game_ms=<目标毫秒>,value=1`，`GameTimeCache` 也应保持在目标值。完整退出游戏再启动用于验证插件重载后的预设读取，HOME/休眠恢复和每日事件可另外检查。出现崩溃、日期异常或事件不同步时，立即把 `Request next boot` 设为 `false` 并保存，恢复原始时钟。
 
 该实验只验证缓存是否控制游戏日历；它没有免惩罚、软重置或每日事件兼容承诺，`adapter-status.json` 仍保持为空。
 
