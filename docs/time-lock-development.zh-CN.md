@@ -39,7 +39,7 @@
 
 编辑下一次启动的目标不会立即改变现有预览。SELECT 才会按新目标重置预览。START+SELECT 仍是原有游戏暂停组合；预览控制不修改游戏 RNG。
 
-`Request next boot`、初始模式与重复使用开关会写入预设。默认情况下界面显示 `Game clock: ORIGINAL (no adapter)`；Y 更新 5 在保存 `Request: true` 且 `Initial mode: Frozen` 后会显示 `TEST FROZEN (cache write)`，每帧把目标毫秒值写入已验证的 `0x005D45E0`。这是临时的内存实验，不是已发布的适配器，不改写存档；关闭 Request 或重启插件即可停用。原有暂停、逐帧和 RNG 页面可继续使用。
+`Request next boot`、初始模式与重复使用开关会写入预设。默认情况下界面显示 `Game clock: ORIGINAL (no adapter)`；Y 更新 5 在保存 `Request: true` 且 `Initial mode: Frozen` 后会显示 `TEST SEED REG HOOK`，只在两个 seed 初始化入口触发一次，在 `0x00146F84` 的时间函数返回寄存器中替换目标值。游戏时间缓存继续使用原始更新路径。这是临时的内存实验，不是已发布的适配器，不改写存档；关闭 Request 或重启插件即可停用。原有暂停、逐帧和 RNG 页面可继续使用。
 
 运行模式预览按平台 tick 前进；休眠覆盖、HOME 恢复和实际游戏时钟语义均未通过实机验收。出现计时倒退或越界会报错，SELECT 可重新开始预览。
 
@@ -88,7 +88,7 @@ quit
 
 ### Pokémon Y 更新 5 的时间缓存诊断
 
-开发版的诊断会在 Title ID `0004000000055E00`、更新值 5 下读取 `0x005D45E0`，缓存发生变化时写入一条 `GameTimeCache` 事件。诊断在 Y 的插件帧循环中运行，不要求一直停留在 Time control 页面；页面只用于按 Y 导出日志。默认状态不写入游戏内存；只有保存缓存写入实验后，才会执行单独的测试写入。事件的 `game_ms`/`value` 是游戏使用的 2000-01-01 纪元毫秒值。
+开发版的诊断会在 Title ID `0004000000055E00`、更新值 5 下读取 `0x005D45E0`，缓存发生变化时写入一条 `GameTimeCache` 事件。锁定实验还会记录一次 `SeedTimeHook`，其中 `value=1` 表示在 seed 时间函数返回寄存器中写入目标值。诊断在 Y 的插件帧循环中运行，不要求一直停留在 Time control 页面；页面只用于按 Y 导出日志。游戏时间缓存保持原始更新路径。事件的 `game_ms`/`value` 是游戏使用的 2000-01-01 纪元毫秒值。
 
 测试步骤：
 
@@ -99,11 +99,11 @@ quit
 
 如果没有 `GameTimeCache` 行，先确认运行的是更新 5、Title ID 是 Y，并检查 `0x005D45E0` 是否映射。该日志只能证明缓存读写时序，仍不能证明所有每日事件或惩罚逻辑都只依赖这一处缓存。
 
-### Y 更新 5 缓存写入实验
+### Y 更新 5 seed 时间寄存器实验
 
-在 Time control 页面选择目标日期，切换 `Request next boot` 为 `true`，保持 `Initial mode` 为 `Frozen`，按 A 保存。保存成功后界面会显示 `TEST FROZEN (cache write)`。此时插件每帧把目标的 2000-01-01 纪元毫秒值写入 `0x005D45E0`，同时继续记录 `GameTimeCache`。
+在 Time control 页面选择目标日期，切换 `Request next boot` 为 `true`，保持 `Initial mode` 为 `Frozen`，按 A 保存。保存成功后界面会显示 `TEST SEED REG HOOK`。此时插件只在 seed 初始化入口触发时间 hook，把目标的 2000-01-01 纪元毫秒值放入时间函数的 `r0:r1` 返回寄存器，游戏时间缓存继续由游戏自己更新。
 
-实验顺序：先在当前日期记录一次原始 CSV，再启用测试锁，重新进入游戏并记录 CSV；比较两次日志中的 `GameTimeCache` 是否稳定在目标值。随后做一次完整重启、HOME/休眠恢复和每日事件检查。出现崩溃、日期异常或事件不同步时，立即把 `Request next boot` 设为 `false` 并保存，恢复原始时钟。
+实验顺序：先使用只读版确认游戏帧和 MT seed 正常，再安装这个独立实验版。启用测试锁后使用软重启或从存档返回标题，让游戏重新生成 seed。CSV 应包含 `# game_clock=test-seed-reg-hook` 和 `SeedTimeHook,...,value=1`，同时 `GameTimeCache` 继续推进。出现卡顿、MT seed 读取异常或游戏帧停止时，立即换回只读版。
 
 该实验只验证缓存是否控制游戏日历；它没有免惩罚、软重置或每日事件兼容承诺，`adapter-status.json` 仍保持为空。
 
