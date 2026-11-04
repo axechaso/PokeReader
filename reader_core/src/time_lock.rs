@@ -41,6 +41,8 @@ static mut SESSION: u64 = 0;
 static mut PLATFORM_READY: bool = false;
 static mut LAST_Y_GAME_TIME_CACHE: u64 = u64::MAX;
 static mut Y_GAME_TIME_LOCK_TARGET: Option<u64> = None;
+static mut Y_GAME_TIME_PRESET_LOADED: bool = false;
+static mut Y_SEED_TIME_HOOK_LOGGED: bool = false;
 
 const Y_TITLE_ID: u64 = 0x0004000000055E00;
 const Y_GAME_TIME_CACHE: u32 = 0x005D45E0;
@@ -86,18 +88,16 @@ pub fn observe_seed(seed: u32) {
 }
 
 fn y_title_loaded() -> bool {
-    pnp::title_id() == Y_TITLE_ID
-        && matches!(crate::title::loaded_title(), Ok(crate::title::LoadedTitle::Y))
+    pnp::title_id() == Y_TITLE_ID && matches!(crate::title::loaded_title(), Ok(crate::title::LoadedTitle::Y))
 }
 
 fn set_y_game_time_lock(preset: &Preset) {
-    let target = if y_title_loaded()
-        && preset.enabled
-        && preset.initial_mode == Mode::Frozen
-        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE)
-        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE + 7)
-    {
-        preset.target.to_epoch_ms().ok().and_then(|value| u64::try_from(value).ok())
+    let target = if y_title_loaded() && preset.enabled && preset.initial_mode == Mode::Frozen {
+        preset
+            .target
+            .to_epoch_ms()
+            .ok()
+            .and_then(|value| u64::try_from(value).ok())
     } else {
         None
     };
@@ -106,10 +106,79 @@ fn set_y_game_time_lock(preset: &Preset) {
     }
 }
 
+fn ensure_platform_ready() {
+    unsafe {
+        if !PLATFORM_READY {
+            let _ = host_tl_platform_init();
+            PLATFORM_READY = true;
+        }
+    }
+}
+
+/// Loads the saved Y preset once the game memory is ready so a saved request
+/// also takes effect after a complete game/plugin restart.
+pub fn activate_saved_y_game_time_lock() {
+    if pnp::title_id() != Y_TITLE_ID {
+        unsafe {
+            Y_GAME_TIME_PRESET_LOADED = false;
+            Y_GAME_TIME_LOCK_TARGET = None;
+            Y_SEED_TIME_HOOK_LOGGED = false;
+        }
+        return;
+    }
+    if !y_title_loaded() {
+        return;
+    }
+    let already_loaded = unsafe { Y_GAME_TIME_PRESET_LOADED };
+    if already_loaded {
+        return;
+    }
+    ensure_platform_ready();
+    let (preset, _) = load_preset(Y_TITLE_ID);
+    set_y_game_time_lock(&preset);
+    unsafe {
+        Y_GAME_TIME_PRESET_LOADED = true;
+    }
+}
+
 pub fn apply_y_game_time_lock() {
     let target = unsafe { Y_GAME_TIME_LOCK_TARGET };
+    if y_title_loaded()
+        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE)
+        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE + 7)
+    {
+        if let Some(target) = target {
+            pnp::write_slice(Y_GAME_TIME_CACHE, &target.to_le_bytes());
+        }
+    }
+}
+
+fn observe_seed_time_hook(game_ms: i64, locked: bool) {
+    let should_log = unsafe {
+        if Y_SEED_TIME_HOOK_LOGGED {
+            false
+        } else {
+            Y_SEED_TIME_HOOK_LOGGED = true;
+            true
+        }
+    };
+    if should_log {
+        observe(Event::SeedTimeHook, game_ms, u64::from(locked));
+    }
+}
+
+/// Called by the Y seed-generation branch hook. Returning true tells the
+/// shared branch trampoline to skip the original time function.
+pub fn override_y_seed_time_call(regs: &mut [u32]) -> bool {
+    let target = unsafe { Y_GAME_TIME_LOCK_TARGET };
     if let Some(target) = target {
-        pnp::write_slice(Y_GAME_TIME_CACHE, &target.to_le_bytes());
+        let output = regs[0] as *mut u64;
+        unsafe { core::ptr::write_unaligned(output, target) };
+        observe_seed_time_hook(i64::try_from(target).unwrap_or(-1), true);
+        true
+    } else {
+        observe_seed_time_hook(-1, false);
+        false
     }
 }
 
@@ -189,7 +258,7 @@ fn export_trace() -> bool {
         unsafe { (TRACE, SESSION) }
     };
     let clock_mode = if y_game_time_lock_active() {
-        "test-cache-write"
+        "test-seed-time-and-cache"
     } else {
         "original"
     };
@@ -349,7 +418,7 @@ impl Editor {
         pnp::println!(
             "Game clock: {}",
             if y_game_time_lock_active() {
-                "TEST FROZEN (cache write)"
+                "TEST FROZEN (cache + seed hook)"
             } else {
                 "ORIGINAL (no adapter)"
             }
@@ -380,7 +449,8 @@ impl Editor {
         pnp::println!("B step; SELECT reset; Y export log");
         pnp::println!("Penalty: observe only; soft reset: off");
         if y_game_time_lock_active() {
-            pnp::println!("TEST writes 0x005D45E0 every frame");
+            pnp::println!("TEST hooks seed time at 0x0010DA38");
+            pnp::println!("TEST writes cache 0x005D45E0/frame");
         }
         pnp::println!("{}", self.message);
         if is_locked {
@@ -390,11 +460,8 @@ impl Editor {
 }
 
 pub fn update_and_draw(is_locked: bool) {
+    ensure_platform_ready();
     unsafe {
-        if !PLATFORM_READY {
-            let _ = host_tl_platform_init();
-            PLATFORM_READY = true;
-        }
         if SESSION == 0 {
             SESSION = tick();
         }

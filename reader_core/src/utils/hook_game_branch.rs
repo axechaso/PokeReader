@@ -78,6 +78,55 @@ macro_rules! hook_game_branch {
 
 pub use hook_game_branch;
 
+#[macro_export]
+macro_rules! hook_game_branch_skip {
+    (
+      game_name = $game_name:expr,
+      normal = $normal_fn:ident = $normal_address:expr,
+      skip = $skip_fn:ident = $skip_address:expr,
+  ) => {
+        mod $normal_fn {
+            #[allow(non_upper_case_globals)]
+            pub(super) static mut return_addr: u32 = 0;
+        }
+        mod $skip_fn {
+            #[allow(non_upper_case_globals)]
+            pub(super) static mut return_addr: u32 = 0;
+        }
+
+        let trampoline_addr = $crate::pnp::get_trampoline_addr();
+
+        unsafe {
+            $normal_fn::return_addr = $crate::utils::hook_addr($normal_address, trampoline_addr);
+            $skip_fn::return_addr = $crate::utils::hook_addr($skip_address, trampoline_addr);
+        }
+
+        pub unsafe extern "C" fn route_hook(stack_pointer: *mut u32) {
+            let regs = core::slice::from_raw_parts_mut(stack_pointer, 15);
+
+            if regs[13] == ($normal_address + 4) {
+                $normal_fn(regs, stack_pointer.add(15));
+                regs[14] = regs[13];
+                regs[13] = $normal_fn::return_addr;
+            }
+            if regs[13] == ($skip_address + 4) {
+                let skip_original = $skip_fn(regs, stack_pointer.add(15));
+                regs[14] = regs[13];
+                if !skip_original {
+                    regs[13] = $skip_fn::return_addr;
+                }
+            }
+
+            regs.rotate_right(1);
+        }
+
+        let route_hook_addr = $crate::pnp::get_route_hook_addr();
+        $crate::pnp::write($crate::pnp::pa_from_va_ptr(route_hook_addr), &(route_hook as u32));
+    };
+}
+
+pub use hook_game_branch_skip;
+
 #[cfg(test)]
 mod test {
     use super::*;
