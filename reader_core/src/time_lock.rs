@@ -1,4 +1,4 @@
-//! Development UI, cache diagnostics, and a controlled Y cache-write experiment.
+//! Development UI, cache diagnostics, and a controlled Y seed-time experiment.
 use crate::pnp::{self, Button};
 use alloc::{format, string::String};
 use core::fmt::Write;
@@ -143,18 +143,6 @@ pub fn activate_saved_y_game_time_lock() {
     }
 }
 
-pub fn apply_y_game_time_lock() {
-    let target = unsafe { Y_GAME_TIME_LOCK_TARGET };
-    if y_title_loaded()
-        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE)
-        && pnp::is_memory_mapped(Y_GAME_TIME_CACHE + 7)
-    {
-        if let Some(target) = target {
-            pnp::write_slice(Y_GAME_TIME_CACHE, &target.to_le_bytes());
-        }
-    }
-}
-
 fn observe_seed_time_hook(game_ms: i64, locked: bool) {
     let should_log = unsafe {
         if LAST_Y_SEED_TIME_HOOK_LOCKED == Some(locked) {
@@ -277,7 +265,7 @@ fn export_trace() -> bool {
         unsafe { (TRACE, SESSION) }
     };
     let clock_mode = if y_game_time_lock_active() {
-        "test-seed-time-and-cache"
+        "test-seed-time-hook"
     } else {
         "original"
     };
@@ -437,7 +425,7 @@ impl Editor {
         pnp::println!(
             "Game clock: {}",
             if y_game_time_lock_active() {
-                "TEST FROZEN (cache + seed hook)"
+                "TEST SEED TIME HOOK"
             } else {
                 "ORIGINAL (no adapter)"
             }
@@ -469,7 +457,7 @@ impl Editor {
         pnp::println!("Penalty: observe only; soft reset: off");
         if y_game_time_lock_active() {
             pnp::println!("TEST hooks seed time at 0x0010DA38");
-            pnp::println!("TEST writes cache 0x005D45E0/frame");
+            pnp::println!("Game time cache remains original");
         }
         pnp::println!("{}", self.message);
         if is_locked {
