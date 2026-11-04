@@ -10,7 +10,7 @@ This information can be used to RNG shiny and high IV Pokemon, similar to lua sc
 
 ## Time-control development build
 
-This fork adds a **Time control (dev)** menu, strict per-game date presets, an offline clock laboratory, seed diagnostics, and a native `.3dsx` preset editor. Retail game clocks remain unchanged by default. Pokémon Y update 5 also has an explicit seed-time hook experiment for the newly identified time path; it is not a verified retail adapter. Time-penalty bypass and automatic soft-reset handling are not enabled.
+This fork adds a **Time control (dev)** menu, strict per-game date presets, an offline clock laboratory, seed diagnostics, and a native `.3dsx` preset editor. Retail game clocks remain unchanged by default. Pokémon Y update 5 also has an explicit cache-write experiment for the newly identified time path; it is not a verified retail adapter. Time-penalty bypass and automatic soft-reset handling are not enabled.
 
 See the [Chinese development guide](docs/time-lock-development.zh-CN.md) for installation, controls, testing and the remaining acceptance work. Existing RNG views and frame controls remain available on recognized builds. Game version, code identity probes and hook shapes are checked before installation.
 

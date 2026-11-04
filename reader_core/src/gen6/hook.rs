@@ -12,51 +12,12 @@ fn init_tinymt_hook(regs: &[u32], _stack_pointer: *mut u32) {
     }
 }
 
-fn init_xy_hooks() {
+pub fn init_xy() {
+    utils::hook_gen6_mt_seed(0x1254f8);
     utils::hook_game_branch! {
         game_name = xy,
         init_tinymt_hook = 0x11e880,
     }
-}
-
-fn init_y_hooks() {
-    if crate::pnp::is_memory_mapped(0x1083d4)
-        && crate::pnp::read::<u32>(0x1083d4) == 0xeb001594
-        && crate::pnp::is_memory_mapped(0x1d4084)
-        && crate::pnp::read::<u32>(0x1d4084) == 0xebfce668
-        && crate::pnp::is_memory_mapped(0x10da38)
-        && crate::pnp::read::<u32>(0x10da38) == 0xeb00e54e
-    {
-        utils::hook_game_branch_seed! {
-            game_name = xy,
-            arm_one = arm_initial_seed_hook = 0x1083d4,
-            arm_two = arm_save_seed_hook = 0x1d4084,
-            skip = seed_time_hook = 0x10da38,
-        }
-    } else {
-        init_xy_hooks();
-    }
-}
-
-pub fn init_xy() {
-    utils::hook_gen6_mt_seed(0x1254f8);
-    if crate::pnp::title_id() == 0x0004000000055e00 {
-        init_y_hooks();
-    } else {
-        init_xy_hooks();
-    }
-}
-
-fn seed_time_hook(regs: &mut [u32], _stack_pointer: *mut u32) -> bool {
-    crate::time_lock::override_y_seed_time_call(regs)
-}
-
-fn arm_initial_seed_hook(_regs: &[u32], _stack_pointer: *mut u32) {
-    crate::time_lock::arm_y_seed_time_hook();
-}
-
-fn arm_save_seed_hook(_regs: &[u32], _stack_pointer: *mut u32) {
-    crate::time_lock::arm_y_seed_time_hook();
 }
 
 pub fn init_oras() {

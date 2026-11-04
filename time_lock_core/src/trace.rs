@@ -4,7 +4,6 @@ pub enum Event {
     Startup,
     SeedInput,
     SeedObserved,
-    SeedTimeHook,
     PreviewCommand,
     ClockFault,
     GameTimeCache,
