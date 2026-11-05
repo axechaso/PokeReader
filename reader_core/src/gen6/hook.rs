@@ -38,11 +38,11 @@ pub fn init_xy() {
 }
 
 fn arm_initial_seed_hook(_regs: &[u32], _stack_pointer: *mut u32) {
-    crate::time_lock::arm_y_seed_time_hook();
+    crate::time_lock::arm_y_seed_time_hook(1);
 }
 
 fn arm_save_seed_hook(_regs: &[u32], _stack_pointer: *mut u32) {
-    crate::time_lock::arm_y_seed_time_hook();
+    crate::time_lock::arm_y_seed_time_hook(2);
 }
 
 fn os_time_hook(regs: &mut [u32], _stack_pointer: *mut u32) -> bool {

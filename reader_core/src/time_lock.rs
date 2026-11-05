@@ -44,6 +44,7 @@ static mut Y_GAME_TIME_LOCK_TARGET: Option<u64> = None;
 static mut Y_SEED_TIME_HOOK_ARMED: bool = false;
 static mut LAST_Y_SEED_TIME_HOOK_LOCKED: Option<bool> = None;
 static mut PENDING_Y_SEED_TIME_HOOK: Option<(i64, bool)> = None;
+static mut PENDING_Y_SEED_ARM: Option<u64> = None;
 
 const Y_TITLE_ID: u64 = 0x0004000000055E00;
 const Y_GAME_TIME_CACHE: u32 = 0x005D45E0;
@@ -106,13 +107,15 @@ fn set_y_game_time_lock(preset: &Preset) {
         Y_GAME_TIME_LOCK_TARGET = target;
         Y_SEED_TIME_HOOK_ARMED = false;
         PENDING_Y_SEED_TIME_HOOK = None;
+        PENDING_Y_SEED_ARM = None;
     }
 }
 
-pub fn arm_y_seed_time_hook() {
+pub fn arm_y_seed_time_hook(source: u64) {
     unsafe {
         if Y_GAME_TIME_LOCK_TARGET.is_some() {
             Y_SEED_TIME_HOOK_ARMED = true;
+            PENDING_Y_SEED_ARM = Some(source);
         }
     }
 }
@@ -155,6 +158,10 @@ pub fn override_y_os_time_call(regs: &mut [u32]) -> bool {
 }
 
 pub fn flush_y_seed_time_hook_observation() {
+    let arm = unsafe { core::mem::replace(&mut PENDING_Y_SEED_ARM, None) };
+    if let Some(source) = arm {
+        observe(Event::SeedArm, -1, source);
+    }
     let pending = unsafe { core::mem::replace(&mut PENDING_Y_SEED_TIME_HOOK, None) };
     if let Some((game_ms, locked)) = pending {
         observe_seed_time_hook(game_ms, locked);

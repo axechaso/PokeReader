@@ -4,6 +4,7 @@ pub enum Event {
     Startup,
     SeedInput,
     SeedObserved,
+    SeedArm,
     SeedTimeHook,
     PreviewCommand,
     ClockFault,
